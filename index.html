@@ -50,66 +50,71 @@
 
     <!-- 
       CLIENT-SIDE JAVASCRIPT
-      This script handles the user interaction. It reads the selected file and sends its
-      content to the secure back-end Google Apps Script for processing.
+      This script handles the user interaction and sends data to the back-end.
     -->
     <script>
+        // --- IMPORTANT CONFIGURATION ---
+        // You MUST replace this with the URL you get after deploying your Google Apps Script.
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwR34HEWdmFHZoWY-mdUSV9UWYst1HC6ioGqaCW6BryfBlvE-qRNYoaBmQ_3KCEhyuF/exec";
+        // -----------------------------
+
         const uploadButton = document.getElementById('uploadButton');
         const fileInput = document.getElementById('fileInput');
         const statusDiv = document.getElementById('status');
 
-        // Listen for a click on the "Process File" button
         uploadButton.addEventListener('click', () => {
             const file = fileInput.files[0];
-
-            // Check if a file was selected
             if (!file) {
                 statusDiv.innerText = "Please select a file first!";
                 return;
             }
 
-            // Provide user feedback and disable the button to prevent multiple clicks
             statusDiv.innerText = "Processing... This may take a moment.";
             uploadButton.disabled = true;
             
-            // Use FileReader to read the file content from the user's computer
             const reader = new FileReader();
-
-            // This function runs after the file has been successfully read
             reader.onload = (event) => {
-                // The file content is encoded as a Base64 string. We split off the prefix.
                 const fileContent = event.target.result.split(',')[1];
-                
-                // Create an object to send to the back-end
                 const fileData = {
                     name: file.name,
                     content: fileContent
                 };
               
-                // This is the special function that securely calls your Google Apps Script back-end.
-                // It runs the 'processEtlAndUpsert' function in your Code.gs file.
-                google.script.run
-                    .withSuccessHandler(showSuccess) // Function to run if successful
-                    .withFailureHandler(showError)   // Function to run if an error occurs
-                    .processEtlAndUpsert(fileData);
+                // Use a standard 'fetch' call to send data to the Apps Script back-end
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(fileData),
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8', // Apps Script requires text/plain for POST body
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showSuccess(data.message);
+                    } else {
+                        showError({ message: data.message });
+                    }
+                })
+                .catch(err => {
+                    showError({ message: 'A network error occurred. Please try again.' });
+                    console.error('Fetch Error:', err);
+                });
             };
-
-            // Start reading the file
             reader.readAsDataURL(file);
         });
 
-        // This function is called when the back-end script successfully finishes
         function showSuccess(message) {
             statusDiv.innerText = message;
-            uploadButton.disabled = false; // Re-enable the button
-            fileInput.value = ""; // Clear the file input for the next upload
+            uploadButton.disabled = false;
+            fileInput.value = "";
         }
 
-        // This function is called if the back-end script reports an error
         function showError(error) {
             statusDiv.innerText = "Error: " + error.message;
-            uploadButton.disabled = false; // Re-enable the button
+            uploadButton.disabled = false;
         }
     </script>
 </body>
 </html>
+
