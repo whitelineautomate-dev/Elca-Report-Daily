@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL Uploader Web App</title>
+    <!-- Tailwind CSS for modern styling -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Google Fonts for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+    <!-- Main Application Card -->
+    <div class="bg-white p-8 rounded-xl shadow-lg text-center max-w-lg w-full m-4">
+        
+        <!-- Header Section -->
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">ETL Processing App</h1>
+        <p class="text-gray-600 mb-8">
+            Select the daily raw data Excel file. The app will process it and update the master Google Sheet.
+        </p>
+        
+        <!-- File Input -->
+        <div class="mb-6">
+            <input type="file" id="fileInput" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-3 file:px-5
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100
+                cursor-pointer"/>
+        </div>
+        
+        <!-- Action Button -->
+        <button id="uploadButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg w-full text-lg transition-all duration-300 disabled:bg-gray-400">
+            Process and Update Sheet
+        </button>
+      
+        <!-- Status Display Area -->
+        <div id="status" class="mt-6 text-gray-700 font-medium h-6">
+            <!-- Messages like "Processing..." or "Success!" will appear here -->
+        </div>
+
+    </div>
+
+    <!-- 
+      CLIENT-SIDE JAVASCRIPT
+      This script handles the user interaction. It reads the selected file and sends its
+      content to the secure back-end Google Apps Script for processing.
+    -->
+    <script>
+        const uploadButton = document.getElementById('uploadButton');
+        const fileInput = document.getElementById('fileInput');
+        const statusDiv = document.getElementById('status');
+
+        // Listen for a click on the "Process File" button
+        uploadButton.addEventListener('click', () => {
+            const file = fileInput.files[0];
+
+            // Check if a file was selected
+            if (!file) {
+                statusDiv.innerText = "Please select a file first!";
+                return;
+            }
+
+            // Provide user feedback and disable the button to prevent multiple clicks
+            statusDiv.innerText = "Processing... This may take a moment.";
+            uploadButton.disabled = true;
+            
+            // Use FileReader to read the file content from the user's computer
+            const reader = new FileReader();
+
+            // This function runs after the file has been successfully read
+            reader.onload = (event) => {
+                // The file content is encoded as a Base64 string. We split off the prefix.
+                const fileContent = event.target.result.split(',')[1];
+                
+                // Create an object to send to the back-end
+                const fileData = {
+                    name: file.name,
+                    content: fileContent
+                };
+              
+                // This is the special function that securely calls your Google Apps Script back-end.
+                // It runs the 'processEtlAndUpsert' function in your Code.gs file.
+                google.script.run
+                    .withSuccessHandler(showSuccess) // Function to run if successful
+                    .withFailureHandler(showError)   // Function to run if an error occurs
+                    .processEtlAndUpsert(fileData);
+            };
+
+            // Start reading the file
+            reader.readAsDataURL(file);
+        });
+
+        // This function is called when the back-end script successfully finishes
+        function showSuccess(message) {
+            statusDiv.innerText = message;
+            uploadButton.disabled = false; // Re-enable the button
+            fileInput.value = ""; // Clear the file input for the next upload
+        }
+
+        // This function is called if the back-end script reports an error
+        function showError(error) {
+            statusDiv.innerText = "Error: " + error.message;
+            uploadButton.disabled = false; // Re-enable the button
+        }
+    </script>
+</body>
+</html>
